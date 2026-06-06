@@ -186,7 +186,7 @@
                             <button onclick="closeAuditDock()" class="text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-50 px-2 py-1 rounded-lg transition">✕ Close</button>
                         </div>
                         <div class="flex-1 bg-slate-50 rounded-xl overflow-hidden relative">
-                            <iframe id="dockIframe" src="" class="w-full h-full border-0 absolute inset-0"></iframe>
+                            <iframe id="dockIframe" src="" class="w-full h-full border-0 absolute inset-0" allow="autoplay"></iframe>
                         </div>
                     </div>
                 </div>
@@ -241,35 +241,49 @@
             }
         }
 
+        // FIXED GPS ENGINE: Handles user tracking securely with strict error timeouts for iOS Safari compatibility
         function locateDeviceCity() {
             if (!navigator.geolocation) {
                 alert("Geolocation mapping isn't supported by this browser layer.");
                 return;
             }
-            document.getElementById('expCity').placeholder = "Querying satellite position...";
+            document.getElementById('expCity').value = "";
+            document.getElementById('expCity').placeholder = "Locating device via GPS...";
             
+            const geoOptions = {
+                enableHighAccuracy: true,
+                timeout: 8000,
+                maximumAge: 0
+            };
+
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 try {
-                    const res = await fetch(`https://geocode.maps.co/reverse?lat=${lat}&lon=${lon}`);
+                    // Using standard OpenStreetMap Nominatim reverse lookup endpoint over absolute HTTPS string
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`, {
+                        headers: { 'Accept-Language': 'en' }
+                    });
                     const data = await res.json();
                     if (data && data.address) {
-                        const city = data.address.city || data.address.town || data.address.village || data.address.suburb || "";
+                        const city = data.address.city || data.address.town || data.address.village || data.address.county || "";
                         if (city) {
                             document.getElementById('expCity').value = city;
                         } else {
-                            document.getElementById('expCity').placeholder = "e.g., Chicago";
+                            document.getElementById('expCity').placeholder = "e.g., Seattle";
                         }
                     }
                 } catch(e) {
-                    document.getElementById('expCity').placeholder = "e.g., Chicago";
+                    document.getElementById('expCity').placeholder = "e.g., Seattle";
+                    console.error("Geocoding fetch exception:", e);
                 }
             }, (err) => {
-                document.getElementById('expCity').placeholder = "e.g., Chicago";
-            }, { timeout: 7000 });
+                document.getElementById('expCity').placeholder = "Permission denied / timed out";
+                alert("GPS prompt failed. Please check your iPhone's Privacy Settings for Safari Location Access.");
+            }, geoOptions);
         }
 
+        // FIXED SPLIT DOCK SYSTEM: Translates target link into a preview container to bypass iframe blocking policies
         window.openAuditDock = function(url, vendorName) {
             const container = document.getElementById('tableContainerCard');
             const dock = document.getElementById('auditSplitDock');
@@ -277,7 +291,19 @@
             const title = document.getElementById('dockFileTitle');
 
             title.textContent = `${vendorName} Receipt`;
-            iframe.src = url;
+            
+            // Core Translation Sequence: Converts /view endpoint into an embeddable /preview sandbox token string
+            let cleanPreviewUrl = url;
+            if (url.includes('drive.google.com') && url.includes('/view')) {
+                try {
+                    const fileId = url.split('/d/')[1].split('/')[0];
+                    cleanPreviewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                } catch(err) {
+                    console.error("URL regex expansion block failed:", err);
+                }
+            }
+
+            iframe.src = cleanPreviewUrl;
             
             container.classList.remove('xl:col-span-5');
             container.classList.add('xl:col-span-3');
