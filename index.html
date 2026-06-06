@@ -8,7 +8,6 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <style>
-        /* Smooth scrolling inside view panels */
         .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -138,7 +137,6 @@
             </div>
 
             <div id="auditViewPanel" class="lg:col-span-2 space-y-4 hidden lg:block">
-                
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
                     <div>
                         <input type="text" id="auditSearch" oninput="runLocalAuditFilter()" placeholder="🔍 Search description / vendor..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
@@ -204,7 +202,6 @@
         let filteredExpenses = [];
         let targetFolderId = null;
 
-        // One-Handed Mobile Switchboard Coordinator
         function switchMobileTab(mode) {
             const logPanel = document.getElementById('inputViewPanel');
             const auditPanel = document.getElementById('auditViewPanel');
@@ -305,12 +302,17 @@
                 const files = response.result.files || [];
                 if (files.length > 0) {
                     targetFolderId = files[0].id;
+                    return targetFolderId;
                 } else {
                     const folderMetadata = { name: 'expenses', mimeType: 'application/vnd.google-apps.folder' };
                     const createResp = await gapi.client.drive.files.create({ resource: folderMetadata, fields: 'id' });
                     targetFolderId = createResp.result.id;
+                    return targetFolderId;
                 }
-            } catch (err) { console.error(err); }
+            } catch (err) { 
+                console.error("Folder validation failed:", err); 
+                return null;
+            }
         }
 
         async function pullCategoriesFromCloud() {
@@ -329,7 +331,7 @@
                 expenses = rows.map(r => ({
                     date: r[0] || '', city: r[1] || '', name: r[2] || '',
                     type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', attachment: r[6] || ''
-                })).reverse(); // Show newest submissions on top
+                })).reverse();
                 
                 filteredExpenses = [...expenses];
                 populateAuditFilters();
@@ -347,7 +349,6 @@
             typeFilter.innerHTML = '<option value="">All Expense Types</option>' + categories.map(t => `<option value="${t}">${t}</option>`).join('');
         }
 
-        // High-Speed Local Client Query Engine (Desktop Audit Layer)
         function runLocalAuditFilter() {
             const searchVal = document.getElementById('auditSearch').value.toLowerCase().trim();
             const cityVal = document.getElementById('auditCityFilter').value;
@@ -449,9 +450,17 @@
 
             if (file) {
                 try {
-                    if (!targetFolderId) { await ensureExpensesFolderExists(); }
-                    const metadata = { name: file.name, mimeType: file.mimeType };
-                    if (targetFolderId) { metadata.parents = [targetFolderId]; }
+                    // FIXED: Force sequential resolution right here in the main event execution block
+                    const resolvedFolderId = await ensureExpensesFolderExists();
+
+                    const metadata = { 
+                        name: file.name, 
+                        mimeType: file.mimeType 
+                    };
+                    
+                    if (resolvedFolderId) { 
+                        metadata.parents = [resolvedFolderId]; 
+                    }
 
                     const form = new FormData();
                     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -464,7 +473,7 @@
                     });
                     const uploadResult = await uploadResp.json();
                     if (uploadResult.id) { attachmentUrl = 'https://drive.google.com/file/d/' + uploadResult.id + '/view?usp=drivesdk'; }
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error("Asset target upload error:", err); }
             }
 
             const rowValues = [[
@@ -480,7 +489,6 @@
             try {
                 await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: rowValues } });
                 document.getElementById('expenseForm').reset();
-                // Re-inject auto-date default smoothly
                 document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
                 handleFileSelectionFeedback();
                 await pullFromCloud();
@@ -492,9 +500,7 @@
         });
 
         window.onload = () => {
-            // Auto-Inject System Date Default Initialization 
             document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
-            
             if (API_KEY && CLIENT_ID && SPREADSHEET_ID) {
                 document.getElementById('vaultApiKey').value = API_KEY;
                 document.getElementById('vaultClientId').value = CLIENT_ID;
@@ -505,5 +511,3 @@
     </script>
 </body>
 </html>
-
-
