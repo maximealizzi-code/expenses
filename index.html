@@ -2,142 +2,195 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Work Expense Tracker Workspace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
+    <style>
+        /* Smooth scrolling inside view panels */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-blue-50">
 
-    <div class="max-w-6xl mx-auto p-6">
-        <header class="mb-8 flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <div class="max-w-7xl mx-auto p-4 md:p-6 pb-24 lg:pb-6">
+        <header class="mb-6 flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Work Expense Tracker</h1>
-                <p class="text-xs text-gray-500">Secure Manual Data Sync Engine</p>
+                <h1 class="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">ExpenseEngine</h1>
+                <p class="text-xs text-slate-400 hidden sm:block">Dynamic Mobile Input & Desktop Audit Portal</p>
             </div>
-            <div class="flex items-center gap-4">
-                <button id="configToggleBtn" onclick="toggleConfigPanel()" class="text-gray-400 hover:text-gray-600 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <div class="flex items-center gap-3">
+                <button id="configToggleBtn" onclick="toggleConfigPanel()" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 </button>
-                <button id="authBtn" onclick="handleAuthClick()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition text-sm shadow-sm hidden">
-                    Authorize Google Account
+                <button id="authBtn" onclick="handleAuthClick()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-xl transition text-xs shadow-sm hidden">
+                    Authorize Account
                 </button>
-                <span id="syncStatus" class="text-xs font-semibold px-3 py-1.5 bg-gray-100 text-gray-500 rounded-full">Setup Credentials First</span>
+                <span id="syncStatus" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-500 rounded-full">Setup Credentials First</span>
             </div>
         </header>
 
-        <div id="configPanel" class="mb-8 bg-amber-50 border border-amber-200 p-6 rounded-xl shadow-sm space-y-4 hidden">
-            <h3 class="text-sm font-bold text-amber-900 flex items-center gap-2">
-                <span>Local Vault Environment (Saved securely on this device only)</span>
-            </h3>
+        <div id="configPanel" class="mb-6 bg-amber-50/70 border border-amber-200/60 p-5 rounded-2xl shadow-sm space-y-4 hidden">
+            <h3 class="text-xs font-bold text-amber-900 tracking-wider uppercase">Local Crypt Environment (Saved on device storage only)</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label class="block text-xs font-medium text-amber-800 mb-1">Google API Key</label>
-                    <input type="password" id="vaultApiKey" class="w-full px-3 py-1.5 border border-amber-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500">
+                    <label class="block text-[11px] font-semibold text-amber-800 uppercase mb-1">Google API Key</label>
+                    <input type="password" id="vaultApiKey" class="w-full px-3 py-2 bg-white/80 border border-amber-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-amber-800 mb-1">OAuth Client ID</label>
-                    <input type="password" id="vaultClientId" class="w-full px-3 py-1.5 border border-amber-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500">
+                    <label class="block text-[11px] font-semibold text-amber-800 uppercase mb-1">OAuth Client ID</label>
+                    <input type="password" id="vaultClientId" class="w-full px-3 py-2 bg-white/80 border border-amber-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-amber-800 mb-1">Spreadsheet ID</label>
-                    <input type="password" id="vaultSpreadsheetId" class="w-full px-3 py-1.5 border border-amber-300 rounded-lg text-xs outline-none focus:ring-1 focus:ring-amber-500">
+                    <label class="block text-[11px] font-semibold text-amber-800 uppercase mb-1">Spreadsheet ID</label>
+                    <input type="password" id="vaultSpreadsheetId" class="w-full px-3 py-2 bg-white/80 border border-amber-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition">
                 </div>
             </div>
-            <button onclick="saveVaultConfig()" class="bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold py-1.5 px-4 rounded-lg transition shadow-sm">
-                Lock Configuration to Device
+            <button onclick="saveVaultConfig()" class="bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold py-2 px-5 rounded-xl transition shadow-sm">
+                Lock Configuration Vault
             </button>
         </div>
 
-        <div id="mainDashboard" class="grid grid-cols-1 lg:grid-cols-3 gap-8 opacity-50 pointer-events-none transition-opacity duration-300">
-            <div class="space-y-6 lg:col-span-1">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 class="text-lg font-semibold mb-4 text-gray-900">Log Manual Entry</h2>
+        <div id="analyticsHeader" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 opacity-40 pointer-events-none">
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Aggregated Outlay</p>
+                <p id="totalSum" class="text-xl md:text-2xl font-bold text-slate-900 mt-1">$0.00</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Filtered View Count</p>
+                <p id="rowCount" class="text-xl md:text-2xl font-bold text-slate-900 mt-1">0 rows</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hidden lg:block">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Primary Location</p>
+                <p id="topCity" class="text-xl font-bold text-slate-900 mt-1 truncate">-</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hidden lg:block">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Peak Category</p>
+                <p id="topCategory" class="text-xl font-bold text-slate-900 mt-1 truncate">-</p>
+            </div>
+        </div>
+
+        <div id="mainDashboard" class="grid grid-cols-1 lg:grid-cols-3 gap-6 opacity-40 pointer-events-none transition-opacity duration-300">
+            
+            <div id="inputViewPanel" class="space-y-6 lg:col-span-1 block">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h2 class="text-base font-bold text-slate-900 mb-4 tracking-tight">Capture Entry</h2>
                     <form id="expenseForm" class="space-y-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                                <input type="date" id="expDate" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Date</label>
+                                <input type="date" id="expDate" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-1">City Location</label>
-                                <input type="text" id="expCity" required placeholder="e.g., Chicago" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">City Location</label>
+                                <input type="text" id="expCity" required placeholder="e.g., Paris" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Vendor/Item Name</label>
-                            <input type="text" id="expName" required placeholder="e.g., McMaster-Carr" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                            <label class="block text-[11px] font-medium text-slate-500 mb-1">Vendor / Description</label>
+                            <input type="text" id="expName" required placeholder="e.g., Hotel Indigo" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                         </div>
 
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-1">Amount ($)</label>
-                                <input type="number" id="expAmount" step="0.01" required placeholder="0.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Amount ($)</label>
+                                <input type="number" id="expAmount" step="0.01" required placeholder="0.00" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-700 mb-1">Quantify / Count</label>
-                                <input type="number" id="expQuantify" required value="1" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                <label class="block text-[11px] font-medium text-slate-500 mb-1">Quantify / Count</label>
+                                <input type="number" id="expQuantify" required value="1" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Expense Type (Category)</label>
-                            <select id="expType" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                            <label class="block text-[11px] font-medium text-slate-500 mb-1">Expense Type</label>
+                            <select id="expType" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition"></select>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Receipt Attachment File <span class="text-gray-400 font-normal">(Optional)</span></label>
-                            <input type="file" id="expFile" accept="image/*,application/pdf" class="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <label class="block text-[11px] font-medium text-slate-500 mb-1">Receipt Asset File <span class="text-slate-400 font-normal">(Auto-Upload to /expenses)</span></label>
+                            <div class="mt-1 relative border-2 border-dashed border-slate-200 hover:border-blue-500/50 rounded-xl transition bg-slate-50/50 flex flex-col items-center justify-center p-4 text-center cursor-pointer">
+                                <input type="file" id="expFile" accept="image/*,application/pdf" onchange="handleFileSelectionFeedback()" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                                <svg class="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <span id="filePickerLabel" class="text-[11px] font-medium text-slate-500 truncate max-w-[200px]">Tap to Snapshot Receipt</span>
+                            </div>
                         </div>
 
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition text-xs shadow-sm">
+                        <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-semibold py-3 px-4 rounded-xl transition text-xs shadow-md shadow-blue-500/10 tracking-wide mt-2">
                             Commit Row to Cloud
                         </button>
                     </form>
                 </div>
 
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 class="text-md font-semibold mb-3 text-gray-900">Edit Expense Types</h2>
-                    <div class="flex gap-2 mb-4">
-                        <input type="text" id="newTypeInput" placeholder="Add custom type..." class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none">
-                        <button id="addTypeBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-1.5 rounded-lg text-xs transition">Add</button>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <h2 class="text-sm font-bold text-slate-900 mb-3 tracking-tight">Manage Types</h2>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="newTypeInput" placeholder="New category name..." class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
+                        <button id="addTypeBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-4 rounded-xl text-xs transition">Add</button>
                     </div>
-                    <ul id="typeList" class="space-y-1 max-h-32 overflow-y-auto pr-1"></ul>
+                    <ul id="typeList" class="space-y-1 max-h-36 overflow-y-auto custom-scroll pr-1"></ul>
                 </div>
             </div>
 
-            <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h2 class="text-lg font-semibold text-gray-900">App_Data Local Sync Buffer</h2>
-                        <span id="totalSum" class="text-xl font-bold text-gray-900">$0.00</span>
+            <div id="auditViewPanel" class="lg:col-span-2 space-y-4 hidden lg:block">
+                
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                    <div>
+                        <input type="text" id="auditSearch" oninput="runLocalAuditFilter()" placeholder="🔍 Search description / vendor..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                     </div>
-                    <div class="overflow-x-auto">
+                    <div>
+                        <select id="auditCityFilter" onchange="runLocalAuditFilter()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
+                            <option value="">All Locations (Cities)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <select id="auditTypeFilter" onchange="runLocalAuditFilter()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
+                            <option value="">All Expense Types</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="overflow-x-auto custom-scroll max-h-[580px]">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase bg-gray-50 tracking-wider">
+                                <tr class="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase bg-slate-50/70 tracking-wider sticky top-0 bg-white z-20">
                                     <th class="py-3 px-4">Date</th>
                                     <th class="py-3 px-4">Location</th>
-                                    <th class="py-3 px-4">Details</th>
+                                    <th class="py-3 px-4">Description</th>
                                     <th class="py-3 px-4">Type</th>
                                     <th class="py-3 px-4 text-right">Amount</th>
-                                    <th class="py-3 px-4 text-center">Receipt</th>
+                                    <th class="py-3 px-4 text-center">Asset</th>
                                 </tr>
                             </thead>
-                            <tbody id="tableBody" class="divide-y divide-gray-100 text-xs text-gray-600">
-                                <tr><td colspan="6" class="py-8 text-center text-gray-400">Awaiting secure keys initialization vault sequence...</td></tr>
+                            <tbody id="tableBody" class="divide-y divide-slate-100 text-xs text-slate-600">
+                                <tr><td colspan="6" class="py-12 text-center text-slate-400 font-medium">Initializing secure database loop...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 
+    <nav class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-6 py-2 flex justify-around items-center z-40 shadow-xl">
+        <button id="navLogBtn" onclick="switchMobileTab('log')" class="flex flex-col items-center gap-0.5 text-blue-600 transition font-semibold text-[11px]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            <span>Log Expense</span>
+        </button>
+        <button id="navAuditBtn" onclick="switchMobileTab('audit')" class="flex flex-col items-center gap-0.5 text-slate-400 transition font-medium text-[11px]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            <span>View Buffer</span>
+        </button>
+    </nav>
+
     <script>
-        // ZERO EXPOSED KEYS CORE STRATEGY
         let API_KEY = localStorage.getItem('v_api_key') || '';
         let CLIENT_ID = localStorage.getItem('v_client_id') || '';
         let SPREADSHEET_ID = localStorage.getItem('v_sheet_id') || '';
@@ -148,11 +201,44 @@
         let tokenClient;
         let categories = ['Travel', 'Meals', 'Equipment'];
         let expenses = [];
+        let filteredExpenses = [];
         let targetFolderId = null;
 
+        // One-Handed Mobile Switchboard Coordinator
+        function switchMobileTab(mode) {
+            const logPanel = document.getElementById('inputViewPanel');
+            const auditPanel = document.getElementById('auditViewPanel');
+            const logBtn = document.getElementById('navLogBtn');
+            const auditBtn = document.getElementById('navAuditBtn');
+
+            if (mode === 'log') {
+                logPanel.classList.remove('hidden');
+                auditPanel.classList.add('hidden');
+                logBtn.className = "flex flex-col items-center gap-0.5 text-blue-600 transition font-semibold text-[11px]";
+                auditBtn.className = "flex flex-col items-center gap-0.5 text-slate-400 transition font-medium text-[11px]";
+            } else {
+                logPanel.classList.add('hidden');
+                auditPanel.classList.remove('hidden');
+                auditPanel.classList.add('block');
+                logBtn.className = "flex flex-col items-center gap-0.5 text-slate-400 transition font-medium text-[11px]";
+                auditBtn.className = "flex flex-col items-center gap-0.5 text-blue-600 transition font-semibold text-[11px]";
+            }
+        }
+
+        function handleFileSelectionFeedback() {
+            const picker = document.getElementById('expFile');
+            const label = document.getElementById('filePickerLabel');
+            if (picker.files && picker.files[0]) {
+                label.textContent = "✓ " + picker.files[0].name;
+                label.className = "text-[11px] font-semibold text-emerald-600 truncate max-w-[200px]";
+            } else {
+                label.textContent = "Tap to Snapshot Receipt";
+                label.className = "text-[11px] font-medium text-slate-500 truncate max-w-[200px]";
+            }
+        }
+
         function toggleConfigPanel() {
-            const panel = document.getElementById('configPanel');
-            panel.classList.toggle('hidden');
+            document.getElementById('configPanel').classList.toggle('hidden');
         }
 
         function saveVaultConfig() {
@@ -160,22 +246,20 @@
             const c = document.getElementById('vaultClientId').value.trim();
             const s = document.getElementById('vaultSpreadsheetId').value.trim();
 
-            if(k && c && s) {
+            if (k && c && s) {
                 localStorage.setItem('v_api_key', k);
                 localStorage.setItem('v_client_id', c);
                 localStorage.setItem('v_sheet_id', s);
-                
                 API_KEY = k; CLIENT_ID = c; SPREADSHEET_ID = s;
-                alert('Vault configuration saved securely to device!');
                 toggleConfigPanel();
                 checkAuthStatus();
             } else {
-                alert('Please populate all configuration boxes before saving.');
+                alert('Please populate all credential lines.');
             }
         }
 
         function checkAuthStatus() {
-            if(!API_KEY || !CLIENT_ID || !SPREADSHEET_ID) {
+            if (!API_KEY || !CLIENT_ID || !SPREADSHEET_ID) {
                 document.getElementById('configPanel').classList.remove('hidden');
                 document.getElementById('syncStatus').textContent = "Setup Credentials First";
                 return;
@@ -189,8 +273,9 @@
                         callback: async (resp) => {
                             if (resp.error) return;
                             document.getElementById('authBtn').classList.add('hidden');
-                            document.getElementById('mainDashboard').classList.remove('opacity-50', 'pointer-events-none');
-                            document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-green-50 text-green-700 rounded-full";
+                            document.getElementById('mainDashboard').classList.remove('opacity-40', 'pointer-events-none');
+                            document.getElementById('analyticsHeader').classList.remove('opacity-40', 'pointer-events-none');
+                            document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full";
                             document.getElementById('syncStatus').textContent = "Cloud Active Sync";
                             
                             await ensureExpensesFolderExists();
@@ -199,10 +284,10 @@
                         }
                     });
                     document.getElementById('authBtn').classList.remove('hidden');
+                    document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-500 rounded-full";
                     document.getElementById('syncStatus').textContent = "Awaiting Authorization";
                 } catch(e) {
-                    console.error("Initialization fault. Verify keys inside Vault.", e);
-                    alert("Google initialization failure. Double check your vault settings.");
+                    alert("Initialization error. Verify key details in vault.");
                 }
             });
         }
@@ -225,7 +310,7 @@
                     const createResp = await gapi.client.drive.files.create({ resource: folderMetadata, fields: 'id' });
                     targetFolderId = createResp.result.id;
                 }
-            } catch (err) { console.error("Folder resolution error:", err); }
+            } catch (err) { console.error(err); }
         }
 
         async function pullCategoriesFromCloud() {
@@ -244,43 +329,91 @@
                 expenses = rows.map(r => ({
                     date: r[0] || '', city: r[1] || '', name: r[2] || '',
                     type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', attachment: r[6] || ''
-                }));
+                })).reverse(); // Show newest submissions on top
+                
+                filteredExpenses = [...expenses];
+                populateAuditFilters();
+                calculateAnalyticsMetrics();
                 renderExpenses();
             } catch (err) { console.error(err); }
+        }
+
+        function populateAuditFilters() {
+            const cities = [...new Set(expenses.map(e => e.city).filter(Boolean))];
+            const cityFilter = document.getElementById('auditCityFilter');
+            cityFilter.innerHTML = '<option value="">All Locations (Cities)</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const typeFilter = document.getElementById('auditTypeFilter');
+            typeFilter.innerHTML = '<option value="">All Expense Types</option>' + categories.map(t => `<option value="${t}">${t}</option>`).join('');
+        }
+
+        // High-Speed Local Client Query Engine (Desktop Audit Layer)
+        function runLocalAuditFilter() {
+            const searchVal = document.getElementById('auditSearch').value.toLowerCase().trim();
+            const cityVal = document.getElementById('auditCityFilter').value;
+            const typeVal = document.getElementById('auditTypeFilter').value;
+
+            filteredExpenses = expenses.filter(e => {
+                const matchesSearch = !searchVal || e.name.toLowerCase().includes(searchVal) || e.city.toLowerCase().includes(searchVal) || e.type.toLowerCase().includes(searchVal);
+                const matchesCity = !cityVal || e.city === cityVal;
+                const matchesType = !typeVal || e.type === typeVal;
+                return matchesSearch && matchesCity && matchesType;
+            });
+
+            calculateAnalyticsMetrics();
+            renderExpenses();
+        }
+
+        function calculateAnalyticsMetrics() {
+            let total = 0;
+            const cityCounts = {};
+            const catCounts = {};
+
+            filteredExpenses.forEach(e => {
+                const amt = parseFloat(e.amount || 0);
+                total += amt;
+                if (e.city) cityCounts[e.city] = (cityCounts[e.city] || 0) + amt;
+                if (e.type) catCounts[e.type] = (catCounts[e.type] || 0) + amt;
+            });
+
+            document.getElementById('totalSum').textContent = '$' + total.toFixed(2);
+            document.getElementById('rowCount').textContent = filteredExpenses.length + (filteredExpenses.length === 1 ? ' entry' : ' entries');
+
+            const topC = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, '-');
+            const topK = Object.keys(catCounts).reduce((a, b) => catCounts[a] > catCounts[b] ? a : b, '-');
+
+            document.getElementById('topCity').textContent = topC;
+            document.getElementById('topCategory').textContent = topK;
         }
 
         function renderCategories() {
             const select = document.getElementById('expType');
             select.innerHTML = categories.map(c => '<option value="' + c + '">' + c + '</option>').join('');
             document.getElementById('typeList').innerHTML = categories.map((c, i) => 
-                '<li class="flex justify-between items-center bg-gray-50 px-2 py-1 rounded border border-gray-100 text-xs">' +
-                    '<span>' + c + '</span>' +
-                    '<button type="button" onclick="deleteCategory(' + i + ')" class="text-gray-400 hover:text-red-500 font-bold">×</button>' +
-                '</li>'
+                `<li class="flex justify-between items-center bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-xs font-medium text-slate-700">
+                    <span>${c}</span>
+                    <button type="button" onclick="deleteCategory(${i})" class="text-slate-400 hover:text-red-500 font-bold transition">×</button>
+                </li>`
             ).join('');
         }
 
         function renderExpenses() {
             const body = document.getElementById('tableBody');
-            if (expenses.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">No rows found in spreadsheet.</td></tr>';
-                document.getElementById('totalSum').textContent = '$0.00';
+            if (filteredExpenses.length === 0) {
+                body.innerHTML = '<tr><td colspan="6" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
                 return;
             }
-            let sum = 0;
-            body.innerHTML = expenses.map(e => {
-                sum += parseFloat(e.amount || 0);
-                const attachmentCell = e.attachment ? '<a href="' + e.attachment + '" target="_blank" class="text-blue-600 font-semibold underline">View</a>' : '<span class="text-gray-300">-</span>';
-                return '<tr class="hover:bg-gray-50/50 transition">' +
-                        '<td class="py-3 px-4 font-medium">' + e.date + '</td>' +
-                        '<td class="py-3 px-4">' + e.city + '</td>' +
-                        '<td class="py-3 px-4 font-semibold text-gray-900">' + e.name + '</td>' +
-                        '<td class="py-3 px-4"><span class="px-2 py-0.5 rounded-full bg-gray-100 font-medium">' + e.type + '</span></td>' +
-                        '<td class="py-3 px-4 text-right font-bold text-gray-900">$' + parseFloat(e.amount).toFixed(2) + '</td>' +
-                        '<td class="py-3 px-4 text-center">' + attachmentCell + '</td>' +
-                    '</tr>';
+            body.innerHTML = filteredExpenses.map(e => {
+                const attachmentCell = e.attachment ? `<a href="${e.attachment}" target="_blank" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px]">View</a>` : '<span class="text-slate-300">-</span>';
+                return `<tr class="hover:bg-slate-50/70 transition">
+                        <td class="py-3.5 px-4 font-medium text-slate-500 whitespace-nowrap">${e.date}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city}</td>
+                        <td class="py-3.5 px-4 font-bold text-slate-900 truncate max-w-[180px]">${e.name}</td>
+                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px] tracking-wide uppercase">${e.type}</span></td>
+                        <td class="py-3.5 px-4 text-right font-extrabold text-slate-900">$${parseFloat(e.amount).toFixed(2)}</td>
+                        <td class="py-3.5 px-4 text-center">${attachmentCell}</td>
+                    </tr>`;
             }).join('');
-            document.getElementById('totalSum').textContent = '$' + sum.toFixed(2);
         }
 
         document.getElementById('addTypeBtn').addEventListener('click', async () => {
@@ -305,7 +438,11 @@
 
         document.getElementById('expenseForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            document.getElementById('syncStatus').textContent = "Uploading assets...";
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = "Uploading assets to /expenses...";
+            document.getElementById('syncStatus').textContent = "Syncing Drive...";
+            
             const fileInput = document.getElementById('expFile');
             const file = fileInput.files[0];
             let attachmentUrl = "";
@@ -343,13 +480,22 @@
             try {
                 await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: rowValues } });
                 document.getElementById('expenseForm').reset();
+                // Re-inject auto-date default smoothly
+                document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+                handleFileSelectionFeedback();
                 await pullFromCloud();
                 document.getElementById('syncStatus').textContent = "Cloud Active Sync";
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error(err); } finally {
+                btn.disabled = false;
+                btn.textContent = "Commit Row to Cloud";
+            }
         });
 
         window.onload = () => {
-            if(API_KEY && CLIENT_ID && SPREADSHEET_ID) {
+            // Auto-Inject System Date Default Initialization 
+            document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+            
+            if (API_KEY && CLIENT_ID && SPREADSHEET_ID) {
                 document.getElementById('vaultApiKey').value = API_KEY;
                 document.getElementById('vaultClientId').value = CLIENT_ID;
                 document.getElementById('vaultSpreadsheetId').value = SPREADSHEET_ID;
@@ -359,4 +505,5 @@
     </script>
 </body>
 </html>
+
 
