@@ -440,14 +440,21 @@
                 const rows = response.result.values || [];
                 
                 expenses = rows.map(r => {
+                    // DEFENSIVE BOUNDARY 1: Safely fall back to FALSE if the H column is missing
                     let checkColumnValue = "FALSE";
                     if (r[7] !== undefined && r[7] !== null && r[7] !== "") {
                         checkColumnValue = r[7].toString().toUpperCase().trim();
                     }
                     
+                    // DEFENSIVE BOUNDARY 2: Scrub non-numeric artifacts ($ or commas) to secure computational stability
+                    let cleanAmountString = "0";
+                    if (r[4] !== undefined && r[4] !== null) {
+                        cleanAmountString = r[4].toString().replace(/[\$,]/g, "").trim() || "0";
+                    }
+                    
                     return {
                         date: r[0] || '', city: r[1] || '', name: r[2] || '',
-                        type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', 
+                        type: r[3] || '', amount: cleanAmountString, quantify: r[5] || '1', 
                         attachment: r[6] || '', reimbursed: checkColumnValue
                     };
                 }).reverse();
@@ -491,7 +498,10 @@
             const catCounts = {};
 
             filteredExpenses.forEach(e => {
-                const amt = parseFloat(e.amount || 0);
+                // DEFENSIVE BOUNDARY 3: Guarantee numerical sanity via isNaN check string defaults
+                const parsedNum = parseFloat(e.amount);
+                const amt = isNaN(parsedNum) ? 0 : parsedNum;
+                
                 total += amt;
                 if (e.reimbursed !== 'TRUE') { pending += amt; }
                 if (e.city) cityCounts[e.city] = (cityCounts[e.city] || 0) + amt;
@@ -531,7 +541,9 @@
                 const isChecked = e.reimbursed === 'TRUE' ? 'checked' : '';
                 const attachmentCell = e.attachment ? `<button type="button" onclick="openAuditDock('${e.attachment}', '${cleanVendor}')" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px] inline-block">View</button>` : '<span class="text-slate-300">-</span>';
                 
-                // FIXED LINE: Stripped out the broken inline HTML string syntax duplication error
+                const parsedAmt = parseFloat(e.amount);
+                const displayAmt = isNaN(parsedAmt) ? 0 : parsedAmt;
+
                 return `<tr class="hover:bg-slate-50/70 transition ${e.reimbursed === 'TRUE' ? 'bg-slate-50/50 text-slate-400/80' : ''}">
                         <td class="py-3.5 px-4 text-center">
                             <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${index})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
@@ -540,7 +552,7 @@
                         <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city}</td>
                         <td class="py-3.5 px-4 font-bold ${e.reimbursed === 'TRUE' ? 'line-through text-slate-400 font-medium' : 'text-slate-900'} truncate max-w-[180px]">${e.name}</td>
                         <td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px] tracking-wide uppercase">${e.type}</span></td>
-                        <td class="py-3.5 px-4 text-right font-extrabold ${e.reimbursed === 'TRUE' ? 'text-slate-400 font-semibold' : 'text-slate-900'}">$${parseFloat(e.amount).toFixed(2)}</td>
+                        <td class="py-3.5 px-4 text-right font-extrabold ${e.reimbursed === 'TRUE' ? 'text-slate-400 font-semibold' : 'text-slate-900'}">$${displayAmt.toFixed(2)}</td>
                         <td class="py-3.5 px-4 text-center">${attachmentCell}</td>
                     </tr>`;
             }).join('');
