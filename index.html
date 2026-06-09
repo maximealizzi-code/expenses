@@ -374,4 +374,293 @@
                 return;
             }
 
-            gapi.load('client', async ()
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({ apiKey: API_KEY, discoveryDocs: DISCOVERY_DOCS });
+                    tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID, scope: SCOPES,
+                        callback: async (resp) => {
+                            if (resp.error) return;
+                            document.getElementById('authBtn').classList.add('hidden');
+                            document.getElementById('mainDashboard').classList.remove('opacity-40', 'pointer-events-none');
+                            document.getElementById('analyticsHeader').classList.remove('opacity-40', 'pointer-events-none');
+                            document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full";
+                            document.getElementById('syncStatus').textContent = "Cloud Active Sync";
+                            
+                            await ensureExpensesFolderExists();
+                            await pullCategoriesFromCloud();
+                            await pullFromCloud();
+                        }
+                    });
+                    document.getElementById('authBtn').classList.remove('hidden');
+                    document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-500 rounded-full";
+                    document.getElementById('syncStatus').textContent = "Awaiting Authorization";
+                } catch(e) { alert("Initialization error."); }
+            });
+        }
+
+        function handleAuthClick() {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        }
+
+        async function ensureExpensesFolderExists() {
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: "name = 'expenses' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+                    fields: 'files(id)'
+                });
+                const files = response.result.files || [];
+                if (files.length > 0) {
+                    targetFolderId = files[0].id;
+                    return targetFolderId;
+                } else {
+                    const folderMetadata = { name: 'expenses', mimeType: 'application/vnd.google-apps.folder' };
+                    const createResp = await gapi.client.drive.files.create({ resource: folderMetadata, fields: 'id' });
+                    targetFolderId = createResp.result.id;
+                    return targetFolderId;
+                }
+            } catch (err) { return null; }
+        }
+
+        async function pullCategoriesFromCloud() {
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A2:A' });
+                const rows = response.result.values || [];
+                if (rows.length > 0) { categories = rows.map(r => r[0]); }
+                renderCategories();
+            } catch (err) { renderCategories(); }
+        }
+
+        async function pullFromCloud() {
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:H' });
+                const rows = response.result.values || [];
+                
+                expenses = rows.map((r, i) => {
+                    let checkColumnValue = "FALSE";
+                    if (r[7] !== undefined && r[7] !== null && r[7] !== "") {
+                        checkColumnValue = r[7].toString().toUpperCase().trim();
+                    }
+                    
+                    let cleanAmountString = "0";
+                    if (r[4] !== undefined && r[4] !== null) {
+                        cleanAmountString = r[4].toString().replace(/[\$,]/g, "").trim() || "0";
+                    }
+
+                    let cleanCountString = "1";
+                    if (r[5] !== undefined && r[5] !== null) {
+                        cleanCountString = r[5].toString().trim() || "1";
+                    }
+                    
+                    return {
+                        sheetRow: i + 2, 
+                        date: r[0] || '', 
+                        city: r[1] || '', 
+                        name: r[2] || '',
+                        type: r[3] || '', 
+                        amount: cleanAmountString, 
+                        quantify: cleanCountString, 
+                        attachment: r[6] || '', 
+                        reimbursed: checkColumnValue
+                    };
+                }).reverse();
+                
+                filteredExpenses = [...expenses];
+                populateAuditFilters();
+                calculateAnalyticsMetrics();
+                renderExpenses();
+            } catch (err) { console.error("Cloud buffer sync interrupted:", err); }
+        }
+
+        function populateAuditFilters() {
+            const cities = [...new Set(expenses.map(e => e.city).filter(Boolean))];
+            const cityFilter = document.getElementById('auditCityFilter');
+            cityFilter.innerHTML = '<option value="">All Locations (Cities)</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const typeFilter = document.getElementById('auditTypeFilter');
+            typeFilter.innerHTML = '<option value="">All Expense Types</option>' + categories.map(t => `<option value="${t}">${t}</option>`).join('');
+        }
+
+        function runLocalAuditFilter() {
+            const searchVal = document.getElementById('auditSearch').value.toLowerCase().trim();
+            const cityVal = document.getElementById('auditCityFilter').value;
+            const typeVal = document.getElementById('auditTypeFilter').value;
+
+            filteredExpenses = expenses.filter(e => {
+                const matchesSearch = !searchVal || e.name.toLowerCase().includes(searchVal) || e.city.toLowerCase().includes(searchVal) || e.type.toLowerCase().includes(searchVal);
+                const matchesCity = !cityVal || e.city === cityVal;
+                const matchesType = !typeVal || e.type === typeVal;
+                return matchesSearch && matchesCity && matchesType;
+            });
+
+            calculateAnalyticsMetrics();
+            renderExpenses();
+        }
+
+        function calculateAnalyticsMetrics() {
+            let total = 0;
+            let pending = 0;
+            const cityCounts = {};
+            const catCounts = {};
+
+            filteredExpenses.forEach(e => {
+                const parsedNum = parseFloat(e.amount);
+                const amt = isNaN(parsedNum) ? 0 : parsedNum;
+                
+                total += amt;
+                if (e.reimbursed !== 'TRUE') { pending += amt; }
+                if (e.city) cityCounts[e.city] = (cityCounts[e.city] || 0) + amt;
+                if (e.type) catCounts[e.type] = (catCounts[e.type] || 0) + amt;
+            });
+
+            document.getElementById('totalSum').textContent = '$' + total.toFixed(2);
+            document.getElementById('pendingSum').textContent = '$' + pending.toFixed(2);
+
+            const topC = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, '-');
+            const topK = Object.keys(catCounts).reduce((a, b) => catCounts[a] > catCounts[b] ? a : b, '-');
+
+            document.getElementById('topCity').textContent = topC;
+            document.getElementById('topCategory').textContent = topK;
+        }
+
+        function renderCategories() {
+            const select = document.getElementById('expType');
+            select.innerHTML = categories.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+            document.getElementById('typeList').innerHTML = categories.map((c, i) => 
+                `<li class="flex justify-between items-center bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-xs font-medium text-slate-700">
+                    <span>${c}</span>
+                    <button type="button" onclick="deleteCategory(${i})" class="text-slate-400 hover:text-red-500 font-bold transition">×</button>
+                </li>`
+            ).join('');
+        }
+
+        function renderExpenses() {
+            const body = document.getElementById('tableBody');
+            if (!body) return;
+            
+            if (filteredExpenses.length === 0) {
+                body.innerHTML = '<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
+                return;
+            }
+            
+            body.innerHTML = filteredExpenses.map((e) => {
+                const cleanVendor = (e.name || '').replace(/['"]/g, "");
+                const isChecked = e.reimbursed === 'TRUE' ? 'checked' : '';
+                const attachmentCell = e.attachment ? `<button type="button" onclick="openAuditDock('${e.attachment}', '${cleanVendor}')" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px] inline-block">View</button>` : '<span class="text-slate-300">-</span>';
+                
+                const parsedAmt = parseFloat(e.amount);
+                const displayAmt = isNaN(parsedAmt) ? 0 : parsedAmt;
+                const displayRowCoordinate = e.sheetRow || 0;
+
+                return `<tr class="hover:bg-slate-50/70 transition ${e.reimbursed === 'TRUE' ? 'bg-slate-50/50 text-slate-400/80' : ''}">
+                        <td class="py-3.5 px-4 text-center">
+                            <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${displayRowCoordinate})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
+                        </td>
+                        <td class="py-3.5 px-4 font-medium text-slate-500 whitespace-nowrap">${e.date || ''}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city || ''}</td>
+                        <td class="py-3.5 px-4 font-bold ${e.reimbursed === 'TRUE' ? 'line-through text-slate-400 font-medium' : 'text-slate-900'} truncate max-w-[180px]">${e.name || ''}</td>
+                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px] tracking-wide uppercase">${e.type || ''}</span></td>
+                        <td class="py-3.5 px-4 text-right font-extrabold ${e.reimbursed === 'TRUE' ? 'text-slate-400 font-semibold' : 'text-slate-900'}">$${displayAmt.toFixed(2)}</td>
+                        <td class="py-3.5 px-4 text-center">${attachmentCell}</td>
+                    </tr>`;
+            }).join('');
+        }
+
+        document.getElementById('addTypeBtn').addEventListener('click', async () => {
+            const el = document.getElementById('newTypeInput');
+            const newCat = el.value.trim();
+            if (newCat && !categories.includes(newCat)) {
+                try {
+                    await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1', valueInputOption: 'USER_ENTERED', resource: { values: [[newCat]] } });
+                    el.value = ''; await pullCategoriesFromCloud();
+                } catch (err) { console.error(err); }
+            }
+        });
+
+        window.deleteCategory = async function(i) {
+            categories.splice(i, 1); renderCategories();
+            try {
+                const updateValues = [['Category Name']].concat(categories.map(c => [c]));
+                await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1:A100' });
+                await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1', valueInputOption: 'USER_ENTERED', resource: { values: updateValues } });
+            } catch (err) { console.error(err); }
+        };
+
+        document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = "Uploading assets to /expenses...";
+            document.getElementById('syncStatus').textContent = "Syncing Drive...";
+            
+            const fileInput = document.getElementById('expFile');
+            const file = fileInput.files[0];
+            let attachmentUrl = "";
+
+            const rawDate = document.getElementById('expDate').value;
+            const rawCity = document.getElementById('expCity').value.trim();
+            const rawVendor = document.getElementById('expName').value.trim();
+            const rawType = document.getElementById('expType').value;
+
+            if (file) {
+                try {
+                    const resolvedFolderId = await ensureExpensesFolderExists();
+                    
+                    const fileExtension = file.name.split('.').pop();
+                    const cleanVendorString = rawVendor.replace(/[^a-zA-Z0-9]/g, "-");
+                    const cleanCityString = rawCity.replace(/[^a-zA-Z0-9]/g, "-");
+                    const optimizedFileName = `${rawDate}_${cleanCityString}_${cleanVendorString}_${rawType}.${fileExtension}`;
+
+                    const metadata = { name: optimizedFileName, mimeType: file.mimeType };
+                    if (resolvedFolderId) { metadata.parents = [resolvedFolderId]; }
+
+                    const form = new FormData();
+                    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                    form.append('file', file);
+
+                    const uploadResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+                        method: 'POST',
+                        headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+                        body: form
+                    });
+                    const uploadResult = await uploadResp.json();
+                    if (uploadResult.id) { attachmentUrl = 'https://drive.google.com/file/d/' + uploadResult.id + '/view?usp=drivesdk'; }
+                } catch (err) { console.error(err); }
+            }
+
+            const rowValues = [[
+                rawDate,
+                rawCity,
+                rawVendor,
+                rawType,
+                document.getElementById('expAmount').value,
+                document.getElementById('expQuantify').value,
+                attachmentUrl,
+                "FALSE"
+            ]];
+
+            try {
+                await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: rowValues } });
+                document.getElementById('expenseForm').reset();
+                document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+                handleFileSelectionFeedback();
+                await pullFromCloud();
+                document.getElementById('syncStatus').textContent = "Cloud Active Sync";
+            } catch (err) { console.error(err); } finally {
+                btn.disabled = false;
+                btn.textContent = "Commit Row to Cloud";
+            }
+        });
+
+        window.onload = () => {
+            document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+            if (API_KEY && CLIENT_ID && SPREADSHEET_ID) {
+                document.getElementById('vaultApiKey').value = API_KEY;
+                document.getElementById('vaultClientId').value = CLIENT_ID;
+                document.getElementById('vaultSpreadsheetId').value = SPREADSHEET_ID;
+            }
+            renderCategories(); checkAuthStatus();
+        };
+    </script>
+</body>
+</html>
