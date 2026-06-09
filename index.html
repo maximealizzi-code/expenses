@@ -306,12 +306,10 @@
             dock.classList.add('hidden');
         };
 
-        // NEW MUTATOR LAYER: Fires an instant pinpoint cell update to target row when checked
         window.toggleReimbursementState = async function(checkboxElement, arrayIndex) {
             const expenseItem = filteredExpenses[arrayIndex];
             const isChecked = checkboxElement.checked;
             
-            // Map the inverted layout row index since rows are displayed reversed (.reverse())
             const totalRowsCount = expenses.length;
             const originalSheetRowNumber = totalRowsCount - expenses.indexOf(expenseItem) + 1; 
 
@@ -319,7 +317,6 @@
             document.getElementById('syncStatus').textContent = "Updating Line...";
 
             try {
-                // Pinpoint and overwrite Column H directly for this explicit row container string
                 await gapi.client.sheets.spreadsheets.values.update({
                     spreadsheetId: SPREADSHEET_ID,
                     range: `Sheet1!H${originalSheetRowNumber}`,
@@ -327,15 +324,15 @@
                     resource: { values: [[isChecked ? "TRUE" : "FALSE"]] }
                 });
 
-                // Sync locally to keep running tallies matching perfectly
                 expenseItem.reimbursed = isChecked ? "TRUE" : "FALSE";
                 calculateAnalyticsMetrics();
+                renderExpenses(); // Re-render to instantly apply line-through stylistic changes
                 
                 document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full";
                 document.getElementById('syncStatus').textContent = "Cloud Active Sync";
             } catch (err) {
-                console.error("Failed to commit cell validation update:", err);
-                checkboxElement.checked = !isChecked; // Revert checkbox visual if request crashes
+                console.error(err);
+                checkboxElement.checked = !isChecked;
                 document.getElementById('syncStatus').textContent = "Sync Failure";
             }
         };
@@ -439,20 +436,28 @@
 
         async function pullFromCloud() {
             try {
-                // MODIFIED: Pulling A2 through H now to completely map our new reimbursement check data points
                 const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:H' });
                 const rows = response.result.values || [];
-                expenses = rows.map(r => ({
-                    date: r[0] || '', city: r[1] || '', name: r[2] || '',
-                    type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', 
-                    attachment: r[6] || '', reimbursed: (r[7] || 'FALSE').toUpperCase()
-                })).reverse();
+                
+                expenses = rows.map(r => {
+                    // FIXED LAYER: Strict validation fallback checks if column H array slot exists
+                    let checkColumnValue = "FALSE";
+                    if (r[7] !== undefined && r[7] !== null && r[7] !== "") {
+                        checkColumnValue = r[7].toString().toUpperCase().trim();
+                    }
+                    
+                    return {
+                        date: r[0] || '', city: r[1] || '', name: r[2] || '',
+                        type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', 
+                        attachment: r[6] || '', reimbursed: checkColumnValue
+                    };
+                }).reverse();
                 
                 filteredExpenses = [...expenses];
                 populateAuditFilters();
                 calculateAnalyticsMetrics();
                 renderExpenses();
-            } catch (err) { console.error(err); }
+            } catch (err) { console.error("Cloud buffer sync interrupted:", err); }
         }
 
         function populateAuditFilters() {
@@ -489,12 +494,7 @@
             filteredExpenses.forEach(e => {
                 const amt = parseFloat(e.amount || 0);
                 total += amt;
-                
-                // FIXED METRIC: If row state is not TRUE, stack it to our corporate pending tally card
-                if (e.reimbursed !== 'TRUE') {
-                    pending += amt;
-                }
-
+                if (e.reimbursed !== 'TRUE') { pending += amt; }
                 if (e.city) cityCounts[e.city] = (cityCounts[e.city] || 0) + amt;
                 if (e.type) catCounts[e.type] = (catCounts[e.type] || 0) + amt;
             });
@@ -516,132 +516,4 @@
             document.getElementById('typeList').innerHTML = categories.map((c, i) => 
                 `<li class="flex justify-between items-center bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100 text-xs font-medium text-slate-700">
                     <span>${c}</span>
-                    <button type="button" onclick="deleteCategory(${i})" class="text-slate-400 hover:text-red-500 font-bold transition">×</button>
-                </li>`
-            ).join('');
-        }
-
-        function renderExpenses() {
-            const body = document.getElementById('tableBody');
-            if (filteredExpenses.length === 0) {
-                body.innerHTML = '<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
-                return;
-            }
-            body.innerHTML = filteredExpenses.map((e, index) => {
-                const cleanVendor = e.name.replace(/['"]/g, "");
-                const isChecked = e.reimbursed === 'TRUE' ? 'checked' : '';
-                const attachmentCell = e.attachment ? `<button type="button" onclick="openAuditDock('${e.attachment}', '${cleanVendor}')" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px] inline-block">View</button>` : '<span class="text-slate-300">-</span>';
-                
-                return `<tr class="hover:bg-slate-50/70 transition ${e.reimbursed === 'TRUE' ? 'bg-slate-50/40 text-slate-400' : ''}">
-                        <td class="py-3.5 px-4 text-center">
-                            <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${index})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
-                        </td>
-                        <td class="py-3.5 px-4 font-medium text-slate-500 whitespace-nowrap">${e.date}</td>
-                        <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city}</td>
-                        <td class="py-3.5 px-4 font-bold text-slate-900 truncate max-w-[180px] ${e.reimbursed === 'TRUE' ? 'line-through text-slate-400' : ''}">${e.name}</td>
-                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px] tracking-wide uppercase">${e.type}</span></td>
-                        <td class="py-3.5 px-4 text-right font-extrabold text-slate-900">$${parseFloat(e.amount).toFixed(2)}</td>
-                        <td class="py-3.5 px-4 text-center">${attachmentCell}</td>
-                    </tr>`;
-            }).join('');
-        }
-
-        document.getElementById('addTypeBtn').addEventListener('click', async () => {
-            const el = document.getElementById('newTypeInput');
-            const newCat = el.value.trim();
-            if (newCat && !categories.includes(newCat)) {
-                try {
-                    await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1', valueInputOption: 'USER_ENTERED', resource: { values: [[newCat]] } });
-                    el.value = ''; await pullCategoriesFromCloud();
-                } catch (err) { console.error(err); }
-            }
-        });
-
-        window.deleteCategory = async function(i) {
-            categories.splice(i, 1); renderCategories();
-            try {
-                const updateValues = [['Category Name']].concat(categories.map(c => [c]));
-                await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1:A100' });
-                await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: 'Categories!A1', valueInputOption: 'USER_ENTERED', resource: { values: updateValues } });
-            } catch (err) { console.error(err); }
-        };
-
-        document.getElementById('expenseForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true;
-            btn.textContent = "Uploading assets to /expenses...";
-            document.getElementById('syncStatus').textContent = "Syncing Drive...";
-            
-            const fileInput = document.getElementById('expFile');
-            const file = fileInput.files[0];
-            let attachmentUrl = "";
-
-            const rawDate = document.getElementById('expDate').value;
-            const rawCity = document.getElementById('expCity').value.trim();
-            const rawVendor = document.getElementById('expName').value.trim();
-            const rawType = document.getElementById('expType').value;
-
-            if (file) {
-                try {
-                    const resolvedFolderId = await ensureExpensesFolderExists();
-                    
-                    const fileExtension = file.name.split('.').pop();
-                    const cleanVendorString = rawVendor.replace(/[^a-zA-Z0-9]/g, "-");
-                    const cleanCityString = rawCity.replace(/[^a-zA-Z0-9]/g, "-");
-                    const optimizedFileName = `${rawDate}_${cleanCityString}_${cleanVendorString}_${rawType}.${fileExtension}`;
-
-                    const metadata = { name: optimizedFileName, mimeType: file.mimeType };
-                    if (resolvedFolderId) { metadata.parents = [resolvedFolderId]; }
-
-                    const form = new FormData();
-                    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                    form.append('file', file);
-
-                    const uploadResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-                        method: 'POST',
-                        headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
-                        body: form
-                    });
-                    const uploadResult = await uploadResp.json();
-                    if (uploadResult.id) { attachmentUrl = 'https://drive.google.com/file/d/' + uploadResult.id + '/view?usp=drivesdk'; }
-                } catch (err) { console.error(err); }
-            }
-
-            // MODIFIED: Pushing a raw default "FALSE" tracking string into Column H for all new mobile uploads
-            const rowValues = [[
-                rawDate,
-                rawCity,
-                rawVendor,
-                rawType,
-                document.getElementById('expAmount').value,
-                document.getElementById('expQuantify').value,
-                attachmentUrl,
-                "FALSE"
-            ]];
-
-            try {
-                await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: rowValues } });
-                document.getElementById('expenseForm').reset();
-                document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
-                handleFileSelectionFeedback();
-                await pullFromCloud();
-                document.getElementById('syncStatus').textContent = "Cloud Active Sync";
-            } catch (err) { console.error(err); } finally {
-                btn.disabled = false;
-                btn.textContent = "Commit Row to Cloud";
-            }
-        });
-
-        window.onload = () => {
-            document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
-            if (API_KEY && CLIENT_ID && SPREADSHEET_ID) {
-                document.getElementById('vaultApiKey').value = API_KEY;
-                document.getElementById('vaultClientId').value = CLIENT_ID;
-                document.getElementById('vaultSpreadsheetId').value = SPREADSHEET_ID;
-            }
-            renderCategories(); checkAuthStatus();
-        };
-    </script>
-</body>
-</html>
+                    <button type="button" onclick="deleteCategory(${i})" class="text-slate-400 hover:text-red-500 font-bold transition">×</button
