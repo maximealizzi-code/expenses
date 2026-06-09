@@ -56,12 +56,12 @@
 
         <div id="analyticsHeader" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 opacity-40 pointer-events-none">
             <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Aggregated Outlay</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Filtered Outlay</p>
                 <p id="totalSum" class="text-xl md:text-2xl font-bold text-slate-900 mt-1">$0.00</p>
             </div>
             <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Filtered View Count</p>
-                <p id="rowCount" class="text-xl md:text-2xl font-bold text-slate-900 mt-1">0 rows</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pending Reimbursement</p>
+                <p id="pendingSum" class="text-xl md:text-2xl font-bold text-orange-600 mt-1">$0.00</p>
             </div>
             <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hidden lg:block">
                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Primary Location</p>
@@ -143,8 +143,8 @@
 
             <div id="auditViewPanel" class="lg:col-span-2 space-y-4 hidden lg:block">
                 
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-                    <div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                    <div class="md:col-span-2">
                         <input type="text" id="auditSearch" oninput="runLocalAuditFilter()" placeholder="🔍 Search description / vendor..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition">
                     </div>
                     <div>
@@ -165,6 +165,7 @@
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase bg-slate-50/70 tracking-wider sticky top-0 bg-white z-20">
+                                        <th class="py-3 px-4 text-center w-12">Paid</th>
                                         <th class="py-3 px-4">Date</th>
                                         <th class="py-3 px-4">Location</th>
                                         <th class="py-3 px-4">Description</th>
@@ -174,7 +175,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="tableBody" class="divide-y divide-slate-100 text-xs text-slate-600">
-                                    <tr><td colspan="6" class="py-12 text-center text-slate-400 font-medium">Initializing secure database loop...</td></tr>
+                                    <tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium">Initializing secure database loop...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -241,7 +242,6 @@
             }
         }
 
-        // FIXED GPS ENGINE: Handles user tracking securely with strict error timeouts for iOS Safari compatibility
         function locateDeviceCity() {
             if (!navigator.geolocation) {
                 alert("Geolocation mapping isn't supported by this browser layer.");
@@ -250,40 +250,29 @@
             document.getElementById('expCity').value = "";
             document.getElementById('expCity').placeholder = "Locating device via GPS...";
             
-            const geoOptions = {
-                enableHighAccuracy: true,
-                timeout: 8000,
-                maximumAge: 0
-            };
+            const geoOptions = { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 };
 
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 try {
-                    // Using standard OpenStreetMap Nominatim reverse lookup endpoint over absolute HTTPS string
                     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`, {
                         headers: { 'Accept-Language': 'en' }
                     });
                     const data = await res.json();
                     if (data && data.address) {
                         const city = data.address.city || data.address.town || data.address.village || data.address.county || "";
-                        if (city) {
-                            document.getElementById('expCity').value = city;
-                        } else {
-                            document.getElementById('expCity').placeholder = "e.g., Seattle";
-                        }
+                        if (city) { document.getElementById('expCity').value = city; } 
+                        else { document.getElementById('expCity').placeholder = "e.g., Seattle"; }
                     }
                 } catch(e) {
                     document.getElementById('expCity').placeholder = "e.g., Seattle";
-                    console.error("Geocoding fetch exception:", e);
                 }
             }, (err) => {
                 document.getElementById('expCity').placeholder = "Permission denied / timed out";
-                alert("GPS prompt failed. Please check your iPhone's Privacy Settings for Safari Location Access.");
             }, geoOptions);
         }
 
-        // FIXED SPLIT DOCK SYSTEM: Translates target link into a preview container to bypass iframe blocking policies
         window.openAuditDock = function(url, vendorName) {
             const container = document.getElementById('tableContainerCard');
             const dock = document.getElementById('auditSplitDock');
@@ -292,19 +281,15 @@
 
             title.textContent = `${vendorName} Receipt`;
             
-            // Core Translation Sequence: Converts /view endpoint into an embeddable /preview sandbox token string
             let cleanPreviewUrl = url;
             if (url.includes('drive.google.com') && url.includes('/view')) {
                 try {
                     const fileId = url.split('/d/')[1].split('/')[0];
                     cleanPreviewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-                } catch(err) {
-                    console.error("URL regex expansion block failed:", err);
-                }
+                } catch(err) { console.error(err); }
             }
 
             iframe.src = cleanPreviewUrl;
-            
             container.classList.remove('xl:col-span-5');
             container.classList.add('xl:col-span-3');
             dock.classList.remove('hidden');
@@ -319,6 +304,40 @@
             container.classList.remove('xl:col-span-3');
             container.classList.add('xl:col-span-5');
             dock.classList.add('hidden');
+        };
+
+        // NEW MUTATOR LAYER: Fires an instant pinpoint cell update to target row when checked
+        window.toggleReimbursementState = async function(checkboxElement, arrayIndex) {
+            const expenseItem = filteredExpenses[arrayIndex];
+            const isChecked = checkboxElement.checked;
+            
+            // Map the inverted layout row index since rows are displayed reversed (.reverse())
+            const totalRowsCount = expenses.length;
+            const originalSheetRowNumber = totalRowsCount - expenses.indexOf(expenseItem) + 1; 
+
+            document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full animate-pulse";
+            document.getElementById('syncStatus').textContent = "Updating Line...";
+
+            try {
+                // Pinpoint and overwrite Column H directly for this explicit row container string
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: `Sheet1!H${originalSheetRowNumber}`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [[isChecked ? "TRUE" : "FALSE"]] }
+                });
+
+                // Sync locally to keep running tallies matching perfectly
+                expenseItem.reimbursed = isChecked ? "TRUE" : "FALSE";
+                calculateAnalyticsMetrics();
+                
+                document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full";
+                document.getElementById('syncStatus').textContent = "Cloud Active Sync";
+            } catch (err) {
+                console.error("Failed to commit cell validation update:", err);
+                checkboxElement.checked = !isChecked; // Revert checkbox visual if request crashes
+                document.getElementById('syncStatus').textContent = "Sync Failure";
+            }
         };
 
         function handleFileSelectionFeedback() {
@@ -382,9 +401,7 @@
                     document.getElementById('authBtn').classList.remove('hidden');
                     document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-500 rounded-full";
                     document.getElementById('syncStatus').textContent = "Awaiting Authorization";
-                } catch(e) {
-                    alert("Initialization error. Verify key details in vault.");
-                }
+                } catch(e) { alert("Initialization error."); }
             });
         }
 
@@ -408,10 +425,7 @@
                     targetFolderId = createResp.result.id;
                     return targetFolderId;
                 }
-            } catch (err) { 
-                console.error("Folder validation failed:", err); 
-                return null;
-            }
+            } catch (err) { return null; }
         }
 
         async function pullCategoriesFromCloud() {
@@ -425,11 +439,13 @@
 
         async function pullFromCloud() {
             try {
-                const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:G' });
+                // MODIFIED: Pulling A2 through H now to completely map our new reimbursement check data points
+                const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:H' });
                 const rows = response.result.values || [];
                 expenses = rows.map(r => ({
                     date: r[0] || '', city: r[1] || '', name: r[2] || '',
-                    type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', attachment: r[6] || ''
+                    type: r[3] || '', amount: r[4] || '0', quantify: r[5] || '1', 
+                    attachment: r[6] || '', reimbursed: (r[7] || 'FALSE').toUpperCase()
                 })).reverse();
                 
                 filteredExpenses = [...expenses];
@@ -466,17 +482,25 @@
 
         function calculateAnalyticsMetrics() {
             let total = 0;
+            let pending = 0;
             const cityCounts = {};
             const catCounts = {};
 
             filteredExpenses.forEach(e => {
                 const amt = parseFloat(e.amount || 0);
                 total += amt;
+                
+                // FIXED METRIC: If row state is not TRUE, stack it to our corporate pending tally card
+                if (e.reimbursed !== 'TRUE') {
+                    pending += amt;
+                }
+
                 if (e.city) cityCounts[e.city] = (cityCounts[e.city] || 0) + amt;
                 if (e.type) catCounts[e.type] = (catCounts[e.type] || 0) + amt;
             });
 
             document.getElementById('totalSum').textContent = '$' + total.toFixed(2);
+            document.getElementById('pendingSum').textContent = '$' + pending.toFixed(2);
             document.getElementById('rowCount').textContent = filteredExpenses.length + (filteredExpenses.length === 1 ? ' entry' : ' entries');
 
             const topC = Object.keys(cityCounts).reduce((a, b) => cityCounts[a] > cityCounts[b] ? a : b, '-');
@@ -500,16 +524,21 @@
         function renderExpenses() {
             const body = document.getElementById('tableBody');
             if (filteredExpenses.length === 0) {
-                body.innerHTML = '<tr><td colspan="6" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
                 return;
             }
-            body.innerHTML = filteredExpenses.map(e => {
+            body.innerHTML = filteredExpenses.map((e, index) => {
                 const cleanVendor = e.name.replace(/['"]/g, "");
+                const isChecked = e.reimbursed === 'TRUE' ? 'checked' : '';
                 const attachmentCell = e.attachment ? `<button type="button" onclick="openAuditDock('${e.attachment}', '${cleanVendor}')" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px] inline-block">View</button>` : '<span class="text-slate-300">-</span>';
-                return `<tr class="hover:bg-slate-50/70 transition">
+                
+                return `<tr class="hover:bg-slate-50/70 transition ${e.reimbursed === 'TRUE' ? 'bg-slate-50/40 text-slate-400' : ''}">
+                        <td class="py-3.5 px-4 text-center">
+                            <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${index})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
+                        </td>
                         <td class="py-3.5 px-4 font-medium text-slate-500 whitespace-nowrap">${e.date}</td>
                         <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city}</td>
-                        <td class="py-3.5 px-4 font-bold text-slate-900 truncate max-w-[180px]">${e.name}</td>
+                        <td class="py-3.5 px-4 font-bold text-slate-900 truncate max-w-[180px] ${e.reimbursed === 'TRUE' ? 'line-through text-slate-400' : ''}">${e.name}</td>
                         <td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px] tracking-wide uppercase">${e.type}</span></td>
                         <td class="py-3.5 px-4 text-right font-extrabold text-slate-900">$${parseFloat(e.amount).toFixed(2)}</td>
                         <td class="py-3.5 px-4 text-center">${attachmentCell}</td>
@@ -562,11 +591,7 @@
                     const cleanCityString = rawCity.replace(/[^a-zA-Z0-9]/g, "-");
                     const optimizedFileName = `${rawDate}_${cleanCityString}_${cleanVendorString}_${rawType}.${fileExtension}`;
 
-                    const metadata = { 
-                        name: optimizedFileName, 
-                        mimeType: file.mimeType 
-                    };
-                    
+                    const metadata = { name: optimizedFileName, mimeType: file.mimeType };
                     if (resolvedFolderId) { metadata.parents = [resolvedFolderId]; }
 
                     const form = new FormData();
@@ -580,9 +605,10 @@
                     });
                     const uploadResult = await uploadResp.json();
                     if (uploadResult.id) { attachmentUrl = 'https://drive.google.com/file/d/' + uploadResult.id + '/view?usp=drivesdk'; }
-                } catch (err) { console.error("Asset target upload error:", err); }
+                } catch (err) { console.error(err); }
             }
 
+            // MODIFIED: Pushing a raw default "FALSE" tracking string into Column H for all new mobile uploads
             const rowValues = [[
                 rawDate,
                 rawCity,
@@ -590,7 +616,8 @@
                 rawType,
                 document.getElementById('expAmount').value,
                 document.getElementById('expQuantify').value,
-                attachmentUrl
+                attachmentUrl,
+                "FALSE"
             ]];
 
             try {
