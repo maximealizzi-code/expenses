@@ -306,12 +306,12 @@
             dock.classList.add('hidden');
         };
 
-        window.toggleReimbursementState = async function(checkboxElement, arrayIndex) {
-            const expenseItem = filteredExpenses[arrayIndex];
+        // FIXED TRANSACTION HANDLER: Directly references the hardwired sheetRow identifier
+        window.toggleReimbursementState = async function(checkboxElement, targetSheetRow) {
             const isChecked = checkboxElement.checked;
             
-            const totalRowsCount = expenses.length;
-            const originalSheetRowNumber = totalRowsCount - expenses.indexOf(expenseItem) + 1; 
+            // Find target element by its immutable sheet ID marker
+            const expenseItem = expenses.find(item => item.sheetRow === targetSheetRow);
 
             document.getElementById('syncStatus').className = "text-xs font-semibold px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full animate-pulse";
             document.getElementById('syncStatus').textContent = "Updating Line...";
@@ -319,12 +319,12 @@
             try {
                 await gapi.client.sheets.spreadsheets.values.update({
                     spreadsheetId: SPREADSHEET_ID,
-                    range: `Sheet1!H${originalSheetRowNumber}`,
+                    range: `Sheet1!H${targetSheetRow}`,
                     valueInputOption: 'USER_ENTERED',
                     resource: { values: [[isChecked ? "TRUE" : "FALSE"]] }
                 });
 
-                expenseItem.reimbursed = isChecked ? "TRUE" : "FALSE";
+                if (expenseItem) { expenseItem.reimbursed = isChecked ? "TRUE" : "FALSE"; }
                 calculateAnalyticsMetrics();
                 renderExpenses();
                 
@@ -439,20 +439,20 @@
                 const response = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A2:H' });
                 const rows = response.result.values || [];
                 
-                expenses = rows.map(r => {
-                    // DEFENSIVE BOUNDARY 1: Safely fall back to FALSE if the H column is missing
+                // FIXED COMPILER ARCHITECTURE: Injecting absolute un-reversed sheet coordinates here
+                expenses = rows.map((r, i) => {
                     let checkColumnValue = "FALSE";
                     if (r[7] !== undefined && r[7] !== null && r[7] !== "") {
                         checkColumnValue = r[7].toString().toUpperCase().trim();
                     }
                     
-                    // DEFENSIVE BOUNDARY 2: Scrub non-numeric artifacts ($ or commas) to secure computational stability
                     let cleanAmountString = "0";
                     if (r[4] !== undefined && r[4] !== null) {
                         cleanAmountString = r[4].toString().replace(/[\$,]/g, "").trim() || "0";
                     }
                     
                     return {
+                        sheetRow: i + 2, // Maps precisely to matching Sheet row coordinate matching A2 index baseline
                         date: r[0] || '', city: r[1] || '', name: r[2] || '',
                         type: r[3] || '', amount: cleanAmountString, quantify: r[5] || '1', 
                         attachment: r[6] || '', reimbursed: checkColumnValue
@@ -498,7 +498,6 @@
             const catCounts = {};
 
             filteredExpenses.forEach(e => {
-                // DEFENSIVE BOUNDARY 3: Guarantee numerical sanity via isNaN check string defaults
                 const parsedNum = parseFloat(e.amount);
                 const amt = isNaN(parsedNum) ? 0 : parsedNum;
                 
@@ -536,7 +535,7 @@
                 body.innerHTML = '<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium">No records found matching current query lines.</td></tr>';
                 return;
             }
-            body.innerHTML = filteredExpenses.map((e, index) => {
+            body.innerHTML = filteredExpenses.map((e) => {
                 const cleanVendor = e.name.replace(/['"]/g, "");
                 const isChecked = e.reimbursed === 'TRUE' ? 'checked' : '';
                 const attachmentCell = e.attachment ? `<button type="button" onclick="openAuditDock('${e.attachment}', '${cleanVendor}')" class="text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-1 rounded-lg text-[10px] inline-block">View</button>` : '<span class="text-slate-300">-</span>';
@@ -544,9 +543,10 @@
                 const parsedAmt = parseFloat(e.amount);
                 const displayAmt = isNaN(parsedAmt) ? 0 : parsedAmt;
 
+                // FIXED TEMPLATE PARAMETER: Explicitly binding event parameters straight to e.sheetRow coordinate
                 return `<tr class="hover:bg-slate-50/70 transition ${e.reimbursed === 'TRUE' ? 'bg-slate-50/50 text-slate-400/80' : ''}">
                         <td class="py-3.5 px-4 text-center">
-                            <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${index})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
+                            <input type="checkbox" ${isChecked} onclick="toggleReimbursementState(this, ${e.sheetRow})" class="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition">
                         </td>
                         <td class="py-3.5 px-4 font-medium text-slate-500 whitespace-nowrap">${e.date}</td>
                         <td class="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">${e.city}</td>
